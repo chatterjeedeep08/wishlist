@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Wish } from '../types';
-import { subscribeToWishes } from '../services/wishService';
+import { subscribeToMyPlans, subscribeToWishes } from '../services/wishService';
 import { useAuth } from './AuthContext';
 
 interface WishesContextValue {
   wishes: Wish[];
   activeWishes: Wish[];
   completedWishes: Wish[];
+  /** Wish ids the current user is secretly planning (private to them). */
+  plannedWishIds: Set<string>;
   loading: boolean;
 }
 
@@ -14,13 +16,23 @@ const WishesContext = createContext<WishesContextValue>({
   wishes: [],
   activeWishes: [],
   completedWishes: [],
+  plannedWishIds: new Set(),
   loading: true,
 });
 
 export function WishesProvider({ children }: { children: React.ReactNode }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [wishes, setWishes] = useState<Wish[]>([]);
+  const [plannedWishIds, setPlannedWishIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setPlannedWishIds(new Set());
+      return;
+    }
+    return subscribeToMyPlans(user.uid, setPlannedWishIds);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!profile?.coupleId) {
@@ -45,9 +57,10 @@ export function WishesProvider({ children }: { children: React.ReactNode }) {
       wishes,
       activeWishes: wishes.filter((w) => w.status === 'active'),
       completedWishes: wishes.filter((w) => w.status === 'completed'),
+      plannedWishIds,
       loading,
     }),
-    [wishes, loading]
+    [wishes, plannedWishIds, loading]
   );
 
   return <WishesContext.Provider value={value}>{children}</WishesContext.Provider>;

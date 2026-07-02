@@ -16,14 +16,15 @@ const SOURCE_LABELS: Record<string, string> = {
 interface Props {
   wish: Wish;
   currentUserId: string;
+  /** True when the current user secretly plans this wish (only they know). */
+  isPlanning?: boolean;
   onPress: () => void;
 }
 
-export default function WishCard({ wish, currentUserId, onPress }: Props) {
+export default function WishCard({ wish, currentUserId, isPlanning, onPress }: Props) {
   const meta = typeMeta(wish.type);
   const isMine = wish.createdBy === currentUserId;
-  // Secret planning: only the planner ever sees this indicator.
-  const iAmPlanning = wish.plannedBy === currentUserId;
+  const iAmPlanning = !!isPlanning;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>

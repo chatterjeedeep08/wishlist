@@ -18,7 +18,10 @@ surprises for each other.
   - **Share directly from other apps** (Instagram, Amazon, Chrome, Maps…)
     via the Android/iOS share sheet — the app opens with the link pre-filled
 - **Real-time shared feed** with category filters (Firestore listeners)
-- **Secret planning**: mark a partner's wish as "planning" — the creator never sees it
+- **Full wish editing** — every field (title, category, photo, link, price, priority) can be changed after creation
+- **Secret planning**: mark a partner's wish as "planning" — plans live in a
+  private `plans` collection whose security rules block the creator from ever
+  reading them, so surprises stay secret even at the API level
 - **Completion tracking** with a Completed Wishes memory list
 - **Image uploads** to Firebase Storage
 - **Notifications**: in-app activity feed + push notifications via a Cloud Function
@@ -110,9 +113,15 @@ After installing the build, tap **Share → Wishlist** in Instagram, Amazon,
 Chrome, etc. — the app opens on the link-processing screen with everything
 pre-filled.
 
-### 5. Push notifications (optional)
+### 5. Cloud Functions (recommended)
 
-Deploy the Cloud Function that forwards in-app notifications to Expo push:
+Two functions ship with the app:
+
+- `sendPushOnNotification` — forwards in-app notifications to Expo push
+- `fetchLinkPreview` — server-side link scraping with a crawler user-agent,
+  used automatically as a fallback when on-device metadata extraction comes
+  back incomplete (Instagram in particular). The app works without it, but
+  link previews are noticeably better with it deployed.
 
 ```bash
 cd functions && npm install && cd ..
@@ -142,15 +151,14 @@ without charging — handy for testing the freemium gates). For real billing:
 
 - `users/{userId}` — name, email, partnerId, coupleId, trialStart, subscriptionStatus, pushToken, createdAt
 - `couples/{coupleId}` — user1, user2, inviteCode, createdAt
-- `wishlistItems/{itemId}` — coupleId, createdBy, createdByName, type, source, title, description, image, link, price, priority, plannedBy, status, createdAt, completedAt
+- `wishlistItems/{itemId}` — coupleId, createdBy, createdByName, type, source, title, description, image, link, price, priority, status, createdAt, completedAt
+- `plans/{wishId_userId}` — wishId, userId, coupleId, createdAt
+  (secret plans; rules only allow the planner to read their own docs)
 - `notifications/{id}` — coupleId, toUserId, fromUserName, type, message, read, createdAt
 
 ## Known MVP limitations
 
-- Secret planning is hidden in the UI, but the `plannedBy` field is readable
-  by both partners at the API level; hiding it server-side would need a
-  Cloud Function or per-field rules.
-- Instagram frequently gates reel metadata behind login, so category
-  detection falls back to manual selection when the page can't be read.
-- Wish editing after creation is limited to planning/completion state
-  (full edit is a natural next step).
+- Link metadata extraction is best-effort: if both the on-device fetch and
+  the `fetchLinkPreview` Cloud Function can't read a page (some Instagram
+  content still requires login), the user picks the category and title
+  manually.

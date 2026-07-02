@@ -22,7 +22,7 @@ export type MainStackParamList = {
   Tabs: undefined;
   AddWish: undefined;
   LinkProcessing: { url: string; sharedTitle?: string; fromShare?: boolean };
-  ManualWish: { prefill?: Partial<WishDraft> } | undefined;
+  ManualWish: { prefill?: Partial<WishDraft>; editWishId?: string } | undefined;
   WishDetail: { wishId: string };
   CompletedWishes: undefined;
   Subscription: undefined;

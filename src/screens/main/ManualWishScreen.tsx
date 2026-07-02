@@ -15,7 +15,8 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import TypeSelector from '../../components/TypeSelector';
 import { useAuth } from '../../context/AuthContext';
-import { addWish, WishLimitError } from '../../services/wishService';
+import { useWishes } from '../../context/WishesContext';
+import { addWish, updateWish, WishLimitError } from '../../services/wishService';
 import { uploadWishImage } from '../../services/storageService';
 import { WishPriority, WishType } from '../../types';
 import { colors, radius, spacing } from '../../theme';
@@ -29,18 +30,32 @@ const PRIORITIES: { key: WishPriority; label: string }[] = [
   { key: 'high', label: 'High' },
 ];
 
+/**
+ * Create a wish from scratch, or — when opened with `editWishId` — edit
+ * every field of an existing wish.
+ */
 export default function ManualWishScreen({ navigation, route }: Props) {
   const prefill = route.params?.prefill;
+  const editWishId = route.params?.editWishId;
   const { profile, fullAccess } = useAuth();
+  const { wishes } = useWishes();
 
-  const [title, setTitle] = useState(prefill?.title ?? '');
-  const [description, setDescription] = useState(prefill?.description ?? '');
-  const [link, setLink] = useState(prefill?.link ?? '');
-  const [price, setPrice] = useState(prefill?.price ?? '');
-  const [type, setType] = useState<WishType | null>(prefill?.type ?? null);
-  const [priority, setPriority] = useState<WishPriority>('medium');
+  const editing = editWishId ? wishes.find((w) => w.id === editWishId) : undefined;
+  const initial = editing ?? prefill;
+
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [link, setLink] = useState(initial?.link ?? '');
+  const [price, setPrice] = useState(initial?.price ?? '');
+  const [type, setType] = useState<WishType | null>(initial?.type ?? null);
+  const [priority, setPriority] = useState<WishPriority>(
+    editing?.priority ?? 'medium'
+  );
   const [localImage, setLocalImage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Existing remote image (edit mode) shown until a new one is picked.
+  const displayImage = localImage ?? editing?.image ?? null;
 
   const pickImage = async () => {
     // Image uploads are a premium/trial feature per the freemium model.
@@ -74,25 +89,38 @@ export default function ManualWishScreen({ navigation, route }: Props) {
     }
     setSaving(true);
     try {
-      let imageUrl: string | null = null;
+      let imageUrl: string | null = editing?.image ?? null;
       if (localImage && profile.coupleId) {
         imageUrl = await uploadWishImage(profile.coupleId, localImage);
       }
-      await addWish(
-        profile,
-        {
+      if (editing) {
+        await updateWish(editing.id, {
           type,
-          source: 'manual',
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim(),
           link: link.trim() || null,
           price: price.trim() || null,
           priority,
           image: imageUrl,
-        },
-        fullAccess
-      );
-      navigation.popToTop();
+        });
+        navigation.goBack();
+      } else {
+        await addWish(
+          profile,
+          {
+            type,
+            source: 'manual',
+            title,
+            description,
+            link: link.trim() || null,
+            price: price.trim() || null,
+            priority,
+            image: imageUrl,
+          },
+          fullAccess
+        );
+        navigation.popToTop();
+      }
     } catch (err) {
       if (err instanceof WishLimitError) {
         Alert.alert('Wish limit reached', err.message, [
@@ -110,8 +138,8 @@ export default function ManualWishScreen({ navigation, route }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
       <TouchableOpacity style={styles.imagePicker} onPress={pickImage} activeOpacity={0.8}>
-        {localImage ? (
-          <Image source={{ uri: localImage }} style={styles.image} />
+        {displayImage ? (
+          <Image source={{ uri: displayImage }} style={styles.image} />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Ionicons name="image-outline" size={28} color={colors.textMuted} />
@@ -166,7 +194,12 @@ export default function ManualWishScreen({ navigation, route }: Props) {
         ))}
       </View>
 
-      <Button title="Save wish" onPress={handleSave} loading={saving} style={{ marginTop: spacing.lg }} />
+      <Button
+        title={editing ? 'Save changes' : 'Save wish'}
+        onPress={handleSave}
+        loading={saving}
+        style={{ marginTop: spacing.lg }}
+      />
     </ScrollView>
   );
 }

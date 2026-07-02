@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -56,7 +57,6 @@ export async function addWish(
     link: draft.link ?? null,
     price: draft.price ?? null,
     priority: draft.priority ?? 'medium',
-    plannedBy: null,
     status: 'active' satisfies WishStatus,
     createdAt: serverTimestamp(),
     completedAt: null,
@@ -97,23 +97,64 @@ export async function updateWish(wishId: string, updates: Partial<Wish>) {
   await updateDoc(doc(db, 'wishlistItems', wishId), rest);
 }
 
-export async function deleteWish(wishId: string) {
-  await deleteDoc(doc(db, 'wishlistItems', wishId));
+function planRef(wishId: string, userId: string) {
+  return doc(db, 'plans', `${wishId}_${userId}`);
 }
 
-/** Secret planning: only the planner ever sees this flag (enforced in UI). */
-export async function togglePlanning(wish: Wish, userId: string) {
-  await updateDoc(doc(db, 'wishlistItems', wish.id), {
-    plannedBy: wish.plannedBy === userId ? null : userId,
-  });
+async function removeOwnPlan(wishId: string, userId: string) {
+  try {
+    await deleteDoc(planRef(wishId, userId));
+  } catch {
+    // No plan doc (or already gone) — nothing to clean up.
+  }
+}
+
+export async function deleteWish(wishId: string, userId: string) {
+  await deleteDoc(doc(db, 'wishlistItems', wishId));
+  await removeOwnPlan(wishId, userId);
+}
+
+/**
+ * Secret planning: stored in the private `plans` collection whose security
+ * rules only let the planner read their own docs — the wish's creator can
+ * never see the plan, even by querying Firestore directly.
+ */
+export async function togglePlanning(
+  wish: Wish,
+  userId: string,
+  currentlyPlanning: boolean
+) {
+  if (currentlyPlanning) {
+    await removeOwnPlan(wish.id, userId);
+  } else {
+    await setDoc(planRef(wish.id, userId), {
+      wishId: wish.id,
+      userId,
+      coupleId: wish.coupleId,
+      createdAt: serverTimestamp(),
+    });
+  }
+}
+
+/** Live set of wish ids the current user is secretly planning. */
+export function subscribeToMyPlans(
+  userId: string,
+  callback: (wishIds: Set<string>) => void
+) {
+  const q = query(collection(db, 'plans'), where('userId', '==', userId));
+  return onSnapshot(
+    q,
+    (snap) => callback(new Set(snap.docs.map((d) => d.data().wishId as string))),
+    () => callback(new Set())
+  );
 }
 
 export async function completeWish(wish: Wish, user: UserProfile) {
   await updateDoc(doc(db, 'wishlistItems', wish.id), {
     status: 'completed' satisfies WishStatus,
     completedAt: serverTimestamp(),
-    plannedBy: null,
   });
+  await removeOwnPlan(wish.id, user.uid);
   if (user.partnerId) {
     await createNotification({
       coupleId: wish.coupleId,

@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<MainStackParamList, 'CompletedWishes'>;
 
 export default function CompletedWishesScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const { completedWishes } = useWishes();
+  const { completedWishes, plannedWishIds } = useWishes();
 
   return (
     <View style={styles.container}>
@@ -24,6 +24,7 @@ export default function CompletedWishesScreen({ navigation }: Props) {
           <WishCard
             wish={item}
             currentUserId={user?.uid ?? ''}
+            isPlanning={plannedWishIds.has(item.id)}
             onPress={() => navigation.navigate('WishDetail', { wishId: item.id })}
           />
         )}

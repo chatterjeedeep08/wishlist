@@ -1,3 +1,5 @@
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../config/firebase';
 import { LinkPreview, WishSource, WishType } from '../types';
 
 const SHOPPING_HOSTS = [
@@ -125,11 +127,38 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   }
 }
 
+interface RemotePreview {
+  title: string | null;
+  image: string | null;
+  description: string | null;
+  price: string | null;
+}
+
+/**
+ * Server-side fallback: the fetchLinkPreview Cloud Function fetches the
+ * page as a crawler, which gets past sites (notably Instagram) that hide
+ * OpenGraph tags from mobile clients. Best-effort — returns null when the
+ * function isn't deployed or errors.
+ */
+async function fetchRemotePreview(url: string): Promise<RemotePreview | null> {
+  try {
+    const call = httpsCallable<{ url: string }, RemotePreview>(
+      functions,
+      'fetchLinkPreview'
+    );
+    const res = await call({ url });
+    return res.data;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Builds a LinkPreview for any pasted/shared URL:
  * detects the source app, fetches OpenGraph metadata (title, image, price)
- * and guesses the wish category. Falls back gracefully when the page
- * can't be fetched — the user can always fill fields manually.
+ * and guesses the wish category. When the on-device fetch comes back
+ * incomplete, retries through the fetchLinkPreview Cloud Function. Falls
+ * back gracefully — the user can always fill fields manually.
  */
 export async function parseLink(
   rawUrl: string,
@@ -167,6 +196,18 @@ export async function parseLink(
         matchMeta(html, 'og:price:currency') ??
         '';
       price = currency ? `${currency} ${amount}` : amount;
+    }
+  }
+
+  // On-device scrape incomplete? Ask the Cloud Function, which fetches
+  // with a crawler user-agent that most sites serve full metadata to.
+  if (!title || !image) {
+    const remote = await fetchRemotePreview(url);
+    if (remote) {
+      title = title ?? remote.title;
+      image = image ?? remote.image;
+      description = description ?? remote.description;
+      price = price ?? remote.price;
     }
   }
 
