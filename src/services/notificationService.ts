@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -25,8 +26,31 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Writes an in-app notification document. A Cloud Function (see functions/)
- * picks these up and delivers a push notification to the recipient.
+ * Delivers a push notification straight from the device via Expo's push
+ * API. Cloud Functions would be the classic home for this, but they
+ * require the Blaze plan — sending client-side keeps the whole app on
+ * the free Spark plan. Expo push tokens are only sendable, not readable,
+ * so exposing the partner's token to the sender is low-risk.
+ */
+async function sendExpoPush(toUserId: string, message: string) {
+  const recipient = await getDoc(doc(db, 'users', toUserId));
+  const pushToken = recipient.get('pushToken');
+  if (!pushToken) return;
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: pushToken,
+      title: 'Wishlist 💝',
+      body: message,
+      sound: 'default',
+    }),
+  });
+}
+
+/**
+ * Writes an in-app notification document and pushes it to the partner's
+ * device. Best-effort: failures never block the main action.
  */
 export async function createNotification(input: {
   coupleId: string;
@@ -41,8 +65,8 @@ export async function createNotification(input: {
       read: false,
       createdAt: serverTimestamp(),
     });
+    await sendExpoPush(input.toUserId, input.message);
   } catch (err) {
-    // Notifications are best-effort; never block the main action.
     console.warn('Failed to create notification', err);
   }
 }

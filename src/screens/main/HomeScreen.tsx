@@ -26,7 +26,7 @@ type Props = CompositeScreenProps<
 
 export default function HomeScreen({ navigation }: Props) {
   const { user, profile, partner, status, trialRemaining } = useAuth();
-  const { activeWishes } = useWishes();
+  const { activeWishes, plannedWishIds } = useWishes();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const waitingForPartner = !!profile?.coupleId && !profile.partnerId;
@@ -118,6 +118,7 @@ export default function HomeScreen({ navigation }: Props) {
               key={wish.id}
               wish={wish}
               currentUserId={user?.uid ?? ''}
+              isPlanning={plannedWishIds.has(wish.id)}
               onPress={() => navigation.navigate('WishDetail', { wishId: wish.id })}
             />
           ))

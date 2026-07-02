@@ -151,7 +151,9 @@ function MainNavigator() {
         <MainStack.Screen
           name="ManualWish"
           component={ManualWishScreen}
-          options={{ title: 'New wish' }}
+          options={({ route }) => ({
+            title: route.params?.editWishId ? 'Edit wish' : 'New wish',
+          })}
         />
         <MainStack.Screen
           name="WishDetail"

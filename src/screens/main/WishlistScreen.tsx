@@ -27,7 +27,7 @@ type Props = CompositeScreenProps<
 
 export default function WishlistScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const { activeWishes, loading } = useWishes();
+  const { activeWishes, plannedWishIds, loading } = useWishes();
   const [filter, setFilter] = useState<WishType | 'all'>('all');
 
   const filtered = useMemo(
@@ -57,6 +57,7 @@ export default function WishlistScreen({ navigation }: Props) {
             <WishCard
               wish={item}
               currentUserId={user?.uid ?? ''}
+              isPlanning={plannedWishIds.has(item.id)}
               onPress={() => navigation.navigate('WishDetail', { wishId: item.id })}
             />
           )}

@@ -29,7 +29,7 @@ type Props = NativeStackScreenProps<MainStackParamList, 'WishDetail'>;
 export default function WishDetailScreen({ navigation, route }: Props) {
   const { wishId } = route.params;
   const { user, profile, fullAccess } = useAuth();
-  const { wishes } = useWishes();
+  const { wishes, plannedWishIds } = useWishes();
 
   const wish = wishes.find((w) => w.id === wishId);
 
@@ -43,8 +43,9 @@ export default function WishDetailScreen({ navigation, route }: Props) {
 
   const meta = typeMeta(wish.type);
   const isMine = wish.createdBy === user.uid;
-  // Secret planning: the creator must never see that it's planned.
-  const iAmPlanning = wish.plannedBy === user.uid;
+  // Secret planning: plans live in a private collection, so the creator
+  // can't see them even by querying Firestore directly.
+  const iAmPlanning = plannedWishIds.has(wish.id);
   const completed = wish.status === 'completed';
 
   const handlePlan = async () => {
@@ -59,7 +60,7 @@ export default function WishDetailScreen({ navigation, route }: Props) {
       );
       return;
     }
-    await togglePlanning(wish, user.uid);
+    await togglePlanning(wish, user.uid, iAmPlanning);
   };
 
   const handleComplete = async () => {
@@ -78,7 +79,7 @@ export default function WishDetailScreen({ navigation, route }: Props) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteWish(wish.id);
+          await deleteWish(wish.id, user.uid);
           navigation.goBack();
         },
       },
@@ -138,6 +139,13 @@ export default function WishDetailScreen({ navigation, route }: Props) {
       )}
 
       <View style={styles.actions}>
+        {!completed && (
+          <Button
+            title="Edit wish ✏️"
+            variant="secondary"
+            onPress={() => navigation.navigate('ManualWish', { editWishId: wish.id })}
+          />
+        )}
         {!isMine && !completed && (
           <Button
             title={iAmPlanning ? 'Stop planning 🤫' : 'Plan this (secret) 🤫'}

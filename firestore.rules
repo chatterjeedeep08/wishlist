@@ -45,6 +45,16 @@ service cloud.firestore {
         && isCoupleMember(request.resource.data.coupleId);
     }
 
+    // Secret plans: strictly private to the planner. The wish's creator
+    // has no way to read these, which is what keeps surprises secret.
+    match /plans/{planId} {
+      allow read, delete: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && planId == request.resource.data.wishId + '_' + request.auth.uid
+        && isCoupleMember(request.resource.data.coupleId);
+    }
+
     match /notifications/{notificationId} {
       allow read, update: if signedIn() && resource.data.toUserId == request.auth.uid;
       allow create: if signedIn();

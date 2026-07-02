@@ -49,7 +49,6 @@ export interface Wish {
   link: string | null;
   price: string | null;
   priority: WishPriority;
-  plannedBy: string | null;
   status: WishStatus;
   createdAt: Timestamp | null;
   completedAt: Timestamp | null;
@@ -64,6 +63,18 @@ export interface WishDraft {
   link?: string | null;
   price?: string | null;
   priority?: WishPriority;
+}
+
+/**
+ * A secret plan lives in its own collection (plans/{wishId}_{userId}) with
+ * security rules that only let the planner read it — the wish's creator
+ * can never see it, even at the API level.
+ */
+export interface Plan {
+  wishId: string;
+  userId: string;
+  coupleId: string;
+  createdAt: Timestamp | null;
 }
 
 export type AppNotificationType =

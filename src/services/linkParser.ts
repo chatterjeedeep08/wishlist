@@ -103,16 +103,25 @@ function matchMeta(html: string, property: string): string | null {
   return null;
 }
 
-async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> {
+const BROWSER_UA =
+  'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
+// Many sites (Instagram especially) only serve OpenGraph tags to
+// link-preview crawlers, so we retry with this UA when needed.
+const CRAWLER_UA =
+  'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
+
+async function fetchHtml(
+  url: string,
+  userAgent: string,
+  timeoutMs = 8000
+): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        // Some sites only serve OG tags to crawlers / plain browsers.
-        'User-Agent':
-          'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+        'User-Agent': userAgent,
         Accept: 'text/html,application/xhtml+xml',
       },
     });
@@ -125,11 +134,51 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   }
 }
 
+interface HtmlMeta {
+  title: string | null;
+  image: string | null;
+  description: string | null;
+  price: string | null;
+}
+
+function parseHtmlMeta(html: string): HtmlMeta {
+  let title = matchMeta(html, 'og:title') ?? matchMeta(html, 'twitter:title');
+  if (!title) {
+    const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (t) title = decodeEntities(t[1].trim());
+  }
+
+  let price: string | null = null;
+  const amount =
+    matchMeta(html, 'product:price:amount') ??
+    matchMeta(html, 'og:price:amount') ??
+    matchMeta(html, 'price');
+  if (amount) {
+    const currency =
+      matchMeta(html, 'product:price:currency') ??
+      matchMeta(html, 'og:price:currency') ??
+      '';
+    price = currency ? `${currency} ${amount}` : amount;
+  }
+
+  return {
+    title,
+    image:
+      matchMeta(html, 'og:image') ??
+      matchMeta(html, 'twitter:image') ??
+      matchMeta(html, 'image'),
+    description: matchMeta(html, 'og:description') ?? matchMeta(html, 'description'),
+    price,
+  };
+}
+
 /**
  * Builds a LinkPreview for any pasted/shared URL:
  * detects the source app, fetches OpenGraph metadata (title, image, price)
- * and guesses the wish category. Falls back gracefully when the page
- * can't be fetched — the user can always fill fields manually.
+ * and guesses the wish category. When the browser-UA fetch comes back
+ * incomplete, retries with a crawler user-agent that most sites serve
+ * full metadata to. Falls back gracefully — the user can always fill
+ * fields manually.
  */
 export async function parseLink(
   rawUrl: string,
@@ -143,31 +192,24 @@ export async function parseLink(
   let description: string | null = null;
   let price: string | null = null;
 
-  const html = await fetchHtml(url);
-  if (html) {
-    title = matchMeta(html, 'og:title') ?? matchMeta(html, 'twitter:title') ?? title;
-    if (!title) {
-      const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (t) title = decodeEntities(t[1].trim());
-    }
-    image =
-      matchMeta(html, 'og:image') ??
-      matchMeta(html, 'twitter:image') ??
-      matchMeta(html, 'image');
-    description =
-      matchMeta(html, 'og:description') ?? matchMeta(html, 'description');
+  const merge = (meta: HtmlMeta) => {
+    title = title ?? meta.title;
+    image = image ?? meta.image;
+    description = description ?? meta.description;
+    price = price ?? meta.price;
+  };
 
-    const amount =
-      matchMeta(html, 'product:price:amount') ??
-      matchMeta(html, 'og:price:amount') ??
-      matchMeta(html, 'price');
-    if (amount) {
-      const currency =
-        matchMeta(html, 'product:price:currency') ??
-        matchMeta(html, 'og:price:currency') ??
-        '';
-      price = currency ? `${currency} ${amount}` : amount;
-    }
+  const html = await fetchHtml(url, BROWSER_UA);
+  if (html) {
+    const meta = parseHtmlMeta(html);
+    // Prefer the page's own title over a shared-text title.
+    if (meta.title) title = meta.title;
+    merge(meta);
+  }
+
+  if (!title || !image) {
+    const crawlerHtml = await fetchHtml(url, CRAWLER_UA);
+    if (crawlerHtml) merge(parseHtmlMeta(crawlerHtml));
   }
 
   const detectedType =
