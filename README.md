@@ -99,8 +99,11 @@ firebase deploy --only firestore
 npx expo start
 ```
 
-Works in **Expo Go** for everything except share-intent and real billing
-(both degrade gracefully — see below). Pressing `w` runs the web version
+Works in **Expo Go** for everything except share-intent, push
+notifications (removed from Expo Go since SDK 53 — the in-app
+notifications feed still works) and real billing; all three degrade
+gracefully and work fully in a development build (see below). Pressing
+`w` runs the web version
 (handy for quick UI checks; share-intent, push and billing are
 mobile-only).
 
