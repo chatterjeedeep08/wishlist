@@ -11,19 +11,37 @@ import {
   where,
 } from 'firebase/firestore';
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { db } from '../config/firebase';
 import { AppNotification, AppNotificationType } from '../types';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Expo Go removed remote-push support in SDK 53, and expo-notifications
+// throws as soon as it is imported there. Load it lazily and only outside
+// Expo Go — in Expo Go the app runs without push (in-app notifications
+// still work); development/production builds get the full experience.
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+type NotificationsModule = typeof import('expo-notifications');
+
+let Notifications: NotificationsModule | null = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications') as NotificationsModule;
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (err) {
+    console.warn('expo-notifications unavailable', err);
+    Notifications = null;
+  }
+}
 
 /**
  * Delivers a push notification straight from the device via Expo's push
@@ -95,24 +113,25 @@ export async function registerForPushNotifications(
   userId: string
 ): Promise<string | null> {
   try {
-    if (!Device.isDevice) return null;
+    const N = Notifications;
+    if (!N || !Device.isDevice) return null;
 
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+      await N.setNotificationChannelAsync('default', {
         name: 'Wishlist',
-        importance: Notifications.AndroidImportance.DEFAULT,
+        importance: N.AndroidImportance.DEFAULT,
       });
     }
 
-    const { status: existing } = await Notifications.getPermissionsAsync();
+    const { status: existing } = await N.getPermissionsAsync();
     let status = existing;
     if (existing !== 'granted') {
-      const res = await Notifications.requestPermissionsAsync();
+      const res = await N.requestPermissionsAsync();
       status = res.status;
     }
     if (status !== 'granted') return null;
 
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    const token = (await N.getExpoPushTokenAsync()).data;
     await updateDoc(doc(db, 'users', userId), { pushToken: token });
     return token;
   } catch (err) {
