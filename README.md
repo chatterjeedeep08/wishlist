@@ -100,7 +100,15 @@ npx expo start
 ```
 
 Works in **Expo Go** for everything except share-intent and real billing
-(both degrade gracefully — see below).
+(both degrade gracefully — see below). Pressing `w` runs the web version
+(handy for quick UI checks; share-intent, push and billing are
+mobile-only).
+
+> **Troubleshooting — "Unable to resolve <package>" when bundling:**
+> your `node_modules` is stale or a previous `npm install` failed on a
+> peer-dependency conflict (fixed by the committed `.npmrc`). Delete
+> `node_modules`, run `npm install` again, and restart with
+> `npx expo start -c` to clear Metro's cache.
 
 ### 4. Development build (share-from-other-apps + billing)
 
