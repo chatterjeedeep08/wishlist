@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "wishlistItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "coupleId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "toUserId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "couples",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "inviteCode", "order": "ASCENDING" },
+        { "fieldPath": "user2", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

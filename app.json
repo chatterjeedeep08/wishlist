@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Wishlist",
+    "slug": "wishlist",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "wishlist",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF5F6"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.wishlist.couples"
+    },
+    "android": {
+      "package": "com.wishlist.couples",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF5F6",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": ["text/*", "image/*"]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wishlist uses your photos so you can attach images to wishes."
+        }
+      ]
+    ]
+  }
+}
