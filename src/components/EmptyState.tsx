@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '../theme';
+import { Theme, spacing } from '../theme';
+import { useThemedStyles } from '../context/ThemeContext';
 
 interface Props {
   emoji: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function EmptyState({ emoji, title, subtitle }: Props) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>{emoji}</Text>
@@ -18,15 +20,16 @@ export default function EmptyState({ emoji, title, subtitle }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', padding: spacing.xl },
-  emoji: { fontSize: 48, marginBottom: spacing.md },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 20,
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { alignItems: 'center', padding: spacing.xl },
+    emoji: { fontSize: 48, marginBottom: spacing.md },
+    title: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' },
+    subtitle: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 20,
+    },
+  });

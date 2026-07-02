@@ -19,7 +19,8 @@ import {
   purchasePlan,
   restorePurchases,
 } from '../../services/subscriptionService';
-import { colors, radius, spacing } from '../../theme';
+import { Theme, radius, spacing } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'Subscription'>;
@@ -33,6 +34,8 @@ const FEATURES = [
 
 export default function SubscriptionScreen({ navigation }: Props) {
   const { user, status } = useAuth();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [live, setLive] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -60,8 +63,8 @@ export default function SubscriptionScreen({ navigation }: Props) {
         { text: 'Done', onPress: () => navigation.goBack() },
       ]);
     } catch (err) {
-      const code = (err as any)?.userCancelled;
-      if (!code) Alert.alert('Purchase failed', (err as Error).message);
+      const cancelled = (err as any)?.userCancelled;
+      if (!cancelled) Alert.alert('Purchase failed', (err as Error).message);
     } finally {
       setBuying(false);
     }
@@ -73,7 +76,9 @@ export default function SubscriptionScreen({ navigation }: Props) {
       const restored = await restorePurchases(user.uid);
       Alert.alert(
         restored ? 'Restored!' : 'Nothing to restore',
-        restored ? 'Your premium access is back.' : 'No previous purchases found for this account.'
+        restored
+          ? 'Your premium access is back.'
+          : 'No previous purchases found for this account.'
       );
     } catch (err) {
       Alert.alert('Restore failed', (err as Error).message);
@@ -85,7 +90,9 @@ export default function SubscriptionScreen({ navigation }: Props) {
       <View style={[styles.container, styles.center]}>
         <Text style={{ fontSize: 52 }}>💎</Text>
         <Text style={styles.title}>You're Premium</Text>
-        <Text style={styles.subtitle}>All features are unlocked. Thanks for supporting Wishlist!</Text>
+        <Text style={styles.subtitle}>
+          All features are unlocked. Thanks for supporting Wishlist!
+        </Text>
       </View>
     );
   }
@@ -101,14 +108,14 @@ export default function SubscriptionScreen({ navigation }: Props) {
       <View style={styles.features}>
         {FEATURES.map((f) => (
           <View key={f.text} style={styles.feature}>
-            <Ionicons name={f.icon as any} size={18} color={colors.primary} />
+            <Ionicons name={f.icon as any} size={18} color={theme.colors.primary} />
             <Text style={styles.featureText}>{f.text}</Text>
           </View>
         ))}
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: spacing.lg }} />
       ) : (
         <View style={styles.plans}>
           {plans.map((plan) => {
@@ -127,7 +134,7 @@ export default function SubscriptionScreen({ navigation }: Props) {
                 <Ionicons
                   name={active ? 'radio-button-on' : 'radio-button-off'}
                   size={22}
-                  color={active ? colors.primary : colors.textMuted}
+                  color={active ? theme.colors.primary : theme.colors.textMuted}
                 />
               </TouchableOpacity>
             );
@@ -151,54 +158,55 @@ export default function SubscriptionScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 20,
-  },
-  features: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginVertical: spacing.lg,
-    gap: spacing.md,
-  },
-  feature: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  featureText: { fontSize: 15, fontWeight: '600', color: colors.text },
-  plans: { gap: spacing.sm, marginBottom: spacing.lg },
-  plan: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  planActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  planTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  planPrice: { fontSize: 14, color: colors.textMuted, marginTop: 2 },
-  restore: { alignItems: 'center', marginTop: spacing.md },
-  restoreText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
-  demoNote: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    lineHeight: 18,
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+    title: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: 6,
+      lineHeight: 20,
+    },
+    features: {
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginVertical: spacing.lg,
+      gap: spacing.md,
+    },
+    feature: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    featureText: { fontSize: 15, fontWeight: '600', color: colors.text },
+    plans: { gap: spacing.sm, marginBottom: spacing.lg },
+    plan: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      borderWidth: 2,
+      borderColor: colors.border,
+      padding: spacing.md,
+    },
+    planActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+    planTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+    planPrice: { fontSize: 14, color: colors.textMuted, marginTop: 2 },
+    restore: { alignItems: 'center', marginTop: spacing.md },
+    restoreText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
+    demoNote: {
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.lg,
+      lineHeight: 18,
+    },
+  });

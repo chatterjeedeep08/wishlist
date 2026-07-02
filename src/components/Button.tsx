@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { Theme, radius, spacing } from '../theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 interface Props {
   title: string;
@@ -25,6 +26,8 @@ export default function Button({
   disabled,
   style,
 }: Props) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isDisabled = disabled || loading;
   return (
     <TouchableOpacity
@@ -34,13 +37,14 @@ export default function Button({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? '#fff' : colors.primary} />
+        <ActivityIndicator
+          color={variant === 'primary' || variant === 'danger' ? '#fff' : theme.colors.primary}
+        />
       ) : (
         <Text
           style={[
             styles.text,
             (variant === 'secondary' || variant === 'ghost') && styles.textAlt,
-            variant === 'danger' && styles.textDanger,
           ]}
         >
           {title}
@@ -50,22 +54,20 @@ export default function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primary: { backgroundColor: colors.primary },
-  secondary: {
-    backgroundColor: colors.primaryLight,
-  },
-  danger: { backgroundColor: colors.danger },
-  ghost: { backgroundColor: 'transparent' },
-  disabled: { opacity: 0.5 },
-  text: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  textAlt: { color: colors.primary },
-  textDanger: { color: '#fff' },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    base: {
+      paddingVertical: 14,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.primaryLight },
+    danger: { backgroundColor: colors.danger },
+    ghost: { backgroundColor: 'transparent' },
+    disabled: { opacity: 0.5 },
+    text: { color: '#fff', fontSize: 16, fontWeight: '600' },
+    textAlt: { color: colors.primary },
+  });

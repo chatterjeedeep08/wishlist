@@ -19,6 +19,17 @@ surprises for each other.
     via the Android/iOS share sheet — the app opens with the link pre-filled
 - **Real-time shared feed** with category filters (Firestore listeners)
 - **Full wish editing** — every field (title, category, photo, link, price, priority) can be changed after creation
+- **Six themes** (Love 💕, Cutesy 🎀, Dark 🌙, Modern 🏙️, Nature 🌿, Sunset 🌅)
+  with themed background graphics, plus one-tap **theme sync with your partner**
+- **In-app notification popups + unread badge** — a banner slides in when your
+  partner adds/edits/completes a wish and tapping it opens that wish; the
+  notifications tab shows a red dot while anything is unread
+- **Profile**: profile picture, change password, break the pair, delete
+  account, and a one-time floating-hearts celebration when you first open
+  your profile after pairing (💔 becomes ❤️)
+- **Completion notes** — an optional "how did it go?" note when marking a
+  wish completed, shown on the wish afterwards
+- **Field validation** with inline errors on signup and wish forms
 - **Secret planning**: mark a partner's wish as "planning" — plans live in a
   private `plans` collection whose security rules block the creator from ever
   reading them, so surprises stay secret even at the API level
@@ -53,8 +64,10 @@ src/
   theme.ts                  # Colors, spacing, category metadata
   types/                    # Shared TypeScript models
   context/
-    AuthContext.tsx         # Auth state, live profile, entitlements
+    AuthContext.tsx         # Auth state, live profile + partner, entitlements
     WishesContext.tsx       # Real-time couple wishlist subscription
+    ThemeContext.tsx        # Theme selection, persistence, partner sync
+    NotificationsContext.tsx # Unread count + in-app popup banner state
   services/
     authService.ts          # Signup / login / logout
     coupleService.ts        # Invite codes & pairing
@@ -148,7 +161,7 @@ without charging — handy for testing the freemium gates). For real billing:
 
 ## Data model (Firestore)
 
-- `users/{userId}` — name, email, partnerId, coupleId, trialStart, subscriptionStatus, pushToken, createdAt
+- `users/{userId}` — name, email, partnerId, coupleId, trialStart, subscriptionStatus, pushToken, photo (base64 data URI), theme, themeSync, createdAt
 - `couples/{coupleId}` — user1, user2, inviteCode, createdAt
 - `wishlistItems/{itemId}` — coupleId, createdBy, createdByName, type, source, title, description, image (external URL or inline base64 data URI), link, price, priority, status, createdAt, completedAt
 - `plans/{wishId_userId}` — wishId, userId, coupleId, createdAt

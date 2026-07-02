@@ -26,4 +26,5 @@ export type MainStackParamList = {
   WishDetail: { wishId: string };
   CompletedWishes: undefined;
   Subscription: undefined;
+  ThemeSettings: undefined;
 };

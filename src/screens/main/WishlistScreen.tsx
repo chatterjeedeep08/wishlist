@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,7 +18,8 @@ import WishCard from '../../components/WishCard';
 import CategoryFilter from '../../components/CategoryFilter';
 import EmptyState from '../../components/EmptyState';
 import { WishType } from '../../types';
-import { colors, spacing } from '../../theme';
+import { Theme, spacing } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
 import { MainStackParamList, TabsParamList } from '../../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -28,6 +30,9 @@ type Props = CompositeScreenProps<
 export default function WishlistScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { activeWishes, plannedWishIds, loading } = useWishes();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<WishType | 'all'>('all');
 
   const filtered = useMemo(
@@ -37,7 +42,7 @@ export default function WishlistScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.title}>Our Wishlist</Text>
         <TouchableOpacity onPress={() => navigation.navigate('CompletedWishes')}>
           <Text style={styles.completedLink}>Completed ✓</Text>
@@ -47,7 +52,7 @@ export default function WishlistScreen({ navigation }: Props) {
       <CategoryFilter selected={filter} onSelect={setFilter} />
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        <ActivityIndicator color={theme.colors.primary} style={{ marginTop: spacing.xl }} />
       ) : (
         <FlatList
           data={filtered}
@@ -78,32 +83,32 @@ export default function WishlistScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-  },
-  title: { fontSize: 26, fontWeight: '800', color: colors.text },
-  completedLink: { fontSize: 14, fontWeight: '600', color: colors.success },
-  list: { paddingHorizontal: spacing.md, paddingBottom: 96 },
-  fab: {
-    position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+    },
+    title: { fontSize: 26, fontWeight: '800', color: colors.text },
+    completedLink: { fontSize: 14, fontWeight: '600', color: colors.success },
+    list: { paddingHorizontal: spacing.md, paddingBottom: 96 },
+    fab: {
+      position: 'absolute',
+      right: spacing.lg,
+      bottom: spacing.lg,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+    },
+  });
