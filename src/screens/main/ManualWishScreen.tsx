@@ -17,7 +17,7 @@ import TypeSelector from '../../components/TypeSelector';
 import { useAuth } from '../../context/AuthContext';
 import { useWishes } from '../../context/WishesContext';
 import { addWish, updateWish, WishLimitError } from '../../services/wishService';
-import { uploadWishImage } from '../../services/storageService';
+import { prepareWishImage } from '../../services/imageService';
 import { WishPriority, WishType } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
@@ -90,8 +90,8 @@ export default function ManualWishScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       let imageUrl: string | null = editing?.image ?? null;
-      if (localImage && profile.coupleId) {
-        imageUrl = await uploadWishImage(profile.coupleId, localImage);
+      if (localImage) {
+        imageUrl = await prepareWishImage(localImage);
       }
       if (editing) {
         await updateWish(editing.id, {

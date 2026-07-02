@@ -23,11 +23,15 @@ surprises for each other.
   private `plans` collection whose security rules block the creator from ever
   reading them, so surprises stay secret even at the API level
 - **Completion tracking** with a Completed Wishes memory list
-- **Image uploads** to Firebase Storage
-- **Notifications**: in-app activity feed + push notifications via a Cloud Function
+- **Photo attachments** — compressed on-device and stored inline in Firestore
+  (no Firebase Storage needed)
+- **Notifications**: in-app activity feed + push notifications sent
+  device-to-device via Expo's push API (no server needed)
 - **Freemium model**: 48-hour full-access trial → free tier (max 20 wishes,
   limited images) → Premium subscription (RevenueCat / Google Play Billing,
   with a demo-mode fallback when RevenueCat isn't configured)
+- **Runs entirely on Firebase's free Spark plan** — no Storage, no Cloud
+  Functions, no billing account required
 
 ## Tech stack
 
@@ -35,7 +39,7 @@ surprises for each other.
 |---|---|
 | App | Expo SDK 57 · React Native · TypeScript |
 | Navigation | React Navigation (native stack + bottom tabs) |
-| Backend | Firebase Auth · Firestore · Storage · Cloud Functions |
+| Backend | Firebase Auth · Firestore (free Spark plan) |
 | Share intent | expo-share-intent (dev build required) |
 | Payments | RevenueCat (`react-native-purchases`) |
 | Push | expo-notifications + Expo push API |
@@ -56,16 +60,14 @@ src/
     coupleService.ts        # Invite codes & pairing
     wishService.ts          # Wish CRUD, planning, completion, free-tier limit
     linkParser.ts           # Source detection + OpenGraph metadata extraction
-    storageService.ts       # Image uploads
+    imageService.ts         # On-device photo compression (inline storage)
     notificationService.ts  # In-app + push notifications
     subscriptionService.ts  # Trial logic + RevenueCat wrapper
   hooks/useShareIntentSafe.ts  # Share-sheet integration (Expo Go safe)
   navigation/               # Stacks, tabs, share-intent routing
   screens/                  # 16 screens (auth / partner / main)
-functions/                  # Cloud Function: push on new notification
 firestore.rules             # Security rules
 firestore.indexes.json      # Composite indexes (required)
-storage.rules               # Storage security rules
 ```
 
 ## Getting started
@@ -79,7 +81,8 @@ npm install
 ### 2. Configure Firebase
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com)
-2. Enable **Authentication → Email/Password**, **Firestore**, and **Storage**
+   — the free **Spark plan** is all you need
+2. Enable **Authentication → Email/Password** and **Firestore**
 3. Add a **Web app** and copy its config
 4. `cp .env.example .env` and fill in the `EXPO_PUBLIC_FIREBASE_*` values
 5. Deploy rules and indexes (required — the feed queries need the composite indexes):
@@ -87,7 +90,7 @@ npm install
 ```bash
 npm i -g firebase-tools
 firebase login
-firebase deploy --only firestore,storage
+firebase deploy --only firestore
 ```
 
 ### 3. Run the app
@@ -113,22 +116,7 @@ After installing the build, tap **Share → Wishlist** in Instagram, Amazon,
 Chrome, etc. — the app opens on the link-processing screen with everything
 pre-filled.
 
-### 5. Cloud Functions (recommended)
-
-Two functions ship with the app:
-
-- `sendPushOnNotification` — forwards in-app notifications to Expo push
-- `fetchLinkPreview` — server-side link scraping with a crawler user-agent,
-  used automatically as a fallback when on-device metadata extraction comes
-  back incomplete (Instagram in particular). The app works without it, but
-  link previews are noticeably better with it deployed.
-
-```bash
-cd functions && npm install && cd ..
-firebase deploy --only functions
-```
-
-### 6. RevenueCat (optional)
+### 5. RevenueCat (optional)
 
 Without keys the paywall runs in **demo mode** (subscribing unlocks Premium
 without charging — handy for testing the freemium gates). For real billing:
@@ -151,14 +139,34 @@ without charging — handy for testing the freemium gates). For real billing:
 
 - `users/{userId}` — name, email, partnerId, coupleId, trialStart, subscriptionStatus, pushToken, createdAt
 - `couples/{coupleId}` — user1, user2, inviteCode, createdAt
-- `wishlistItems/{itemId}` — coupleId, createdBy, createdByName, type, source, title, description, image, link, price, priority, status, createdAt, completedAt
+- `wishlistItems/{itemId}` — coupleId, createdBy, createdByName, type, source, title, description, image (external URL or inline base64 data URI), link, price, priority, status, createdAt, completedAt
 - `plans/{wishId_userId}` — wishId, userId, coupleId, createdAt
   (secret plans; rules only allow the planner to read their own docs)
 - `notifications/{id}` — coupleId, toUserId, fromUserName, type, message, read, createdAt
 
+## Spark-plan design choices
+
+To keep the whole app on Firebase's no-cost Spark plan (new projects need
+the Blaze plan for Storage and Cloud Functions), three things work
+differently than a "classic" Firebase setup:
+
+- **Photos** are resized to ≤600px JPEG on-device and stored inline in the
+  wish document as a base64 data URI (typically 40–80 KB) instead of
+  Firebase Storage.
+- **Push notifications** are sent directly from the sender's device to
+  Expo's push API instead of via a Cloud Function trigger.
+- **Link previews** retry with a crawler user-agent on-device instead of
+  scraping server-side.
+
+If you later upgrade to Blaze, moving photos to Storage and push/scraping
+into Cloud Functions are clean, isolated swaps (`imageService.ts`,
+`notificationService.ts`, `linkParser.ts`).
+
 ## Known MVP limitations
 
-- Link metadata extraction is best-effort: if both the on-device fetch and
-  the `fetchLinkPreview` Cloud Function can't read a page (some Instagram
-  content still requires login), the user picks the category and title
-  manually.
+- Link metadata extraction is best-effort: when a page can't be read even
+  with the crawler user-agent retry (some Instagram content requires
+  login), the user picks the category and title manually.
+- Push delivery happens from the acting user's device; if they lose
+  connectivity right after the action, the in-app notification still
+  syncs but the push may not be sent.
