@@ -15,7 +15,6 @@ import {
   trialTimeRemaining,
 } from '../services/subscriptionService';
 import { registerForPushNotifications } from '../services/notificationService';
-import { getPartnerProfile } from '../services/coupleService';
 
 interface AuthContextValue {
   user: User | null;
@@ -77,19 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [user?.uid]);
 
-  // Load partner profile whenever partnerId changes
+  // Live partner profile (name, photo, theme for sync) whenever paired
   useEffect(() => {
-    let cancelled = false;
     if (!profile?.partnerId) {
       setPartner(null);
       return;
     }
-    getPartnerProfile(profile.partnerId).then((p) => {
-      if (!cancelled) setPartner(p);
-    });
-    return () => {
-      cancelled = true;
-    };
+    const unsub = onSnapshot(
+      doc(db, 'users', profile.partnerId),
+      (snap) => setPartner(snap.exists() ? (snap.data() as UserProfile) : null),
+      () => setPartner(null)
+    );
+    return unsub;
   }, [profile?.partnerId]);
 
   // Register for push once logged in

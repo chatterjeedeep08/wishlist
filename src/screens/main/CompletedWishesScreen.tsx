@@ -5,7 +5,8 @@ import WishCard from '../../components/WishCard';
 import EmptyState from '../../components/EmptyState';
 import { useAuth } from '../../context/AuthContext';
 import { useWishes } from '../../context/WishesContext';
-import { colors, spacing } from '../../theme';
+import { Theme, spacing } from '../../theme';
+import { useThemedStyles } from '../../context/ThemeContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'CompletedWishes'>;
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<MainStackParamList, 'CompletedWishes'>;
 export default function CompletedWishesScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { completedWishes, plannedWishIds } = useWishes();
+  const styles = useThemedStyles(makeStyles);
 
   return (
     <View style={styles.container}>
@@ -40,7 +42,8 @@ export default function CompletedWishesScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  list: { padding: spacing.md },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    list: { padding: spacing.md },
+  });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Image,
@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
 import EmptyState from '../../components/EmptyState';
+import PromptModal from '../../components/PromptModal';
 import { useAuth } from '../../context/AuthContext';
 import { useWishes } from '../../context/WishesContext';
 import {
@@ -21,7 +22,8 @@ import {
   reopenWish,
   togglePlanning,
 } from '../../services/wishService';
-import { colors, radius, spacing, typeBg, typeColor, typeMeta } from '../../theme';
+import { Theme, radius, spacing, typeBg, typeColor, typeMeta } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'WishDetail'>;
@@ -30,6 +32,9 @@ export default function WishDetailScreen({ navigation, route }: Props) {
   const { wishId } = route.params;
   const { user, profile, fullAccess } = useAuth();
   const { wishes, plannedWishIds } = useWishes();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const [notePromptVisible, setNotePromptVisible] = useState(false);
 
   const wish = wishes.find((w) => w.id === wishId);
 
@@ -41,6 +46,7 @@ export default function WishDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const c = theme.colors;
   const meta = typeMeta(wish.type);
   const isMine = wish.createdBy === user.uid;
   // Secret planning: plans live in a private collection, so the creator
@@ -63,12 +69,18 @@ export default function WishDetailScreen({ navigation, route }: Props) {
     await togglePlanning(wish, user.uid, iAmPlanning);
   };
 
+  const finishCompletion = async (note?: string) => {
+    setNotePromptVisible(false);
+    await completeWish(wish, profile, note);
+    navigation.goBack();
+  };
+
   const handleComplete = async () => {
     if (completed) {
       await reopenWish(wish.id);
     } else {
-      await completeWish(wish, profile);
-      navigation.goBack();
+      // Optional memory note before marking it done.
+      setNotePromptVisible(true);
     }
   };
 
@@ -88,25 +100,45 @@ export default function WishDetailScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
+      <PromptModal
+        visible={notePromptVisible}
+        title="Wish completed 🎉"
+        message="Add a note about how it went (optional) — it's saved with the memory."
+        placeholder="e.g. Went there for our anniversary, loved it!"
+        confirmLabel="Save"
+        cancelLabel="Skip"
+        multiline
+        onConfirm={(note) => finishCompletion(note)}
+        onCancel={() => finishCompletion()}
+      />
+
       {wish.image ? (
         <Image source={{ uri: wish.image }} style={styles.image} />
       ) : (
-        <View style={[styles.image, styles.imagePlaceholder, { backgroundColor: typeBg(wish.type) }]}>
+        <View
+          style={[
+            styles.image,
+            styles.imagePlaceholder,
+            { backgroundColor: typeBg(theme, wish.type) },
+          ]}
+        >
           <Text style={{ fontSize: 56 }}>{meta.emoji}</Text>
         </View>
       )}
 
       <View style={styles.badgeRow}>
-        <View style={[styles.badge, { backgroundColor: typeBg(wish.type) }]}>
-          <Ionicons name={meta.icon as any} size={13} color={typeColor(wish.type)} />
-          <Text style={[styles.badgeText, { color: typeColor(wish.type) }]}>{meta.label}</Text>
+        <View style={[styles.badge, { backgroundColor: typeBg(theme, wish.type) }]}>
+          <Ionicons name={meta.icon as any} size={13} color={typeColor(theme, wish.type)} />
+          <Text style={[styles.badgeText, { color: typeColor(theme, wish.type) }]}>
+            {meta.label}
+          </Text>
         </View>
         <View style={[styles.badge, styles.priorityBadge]}>
           <Text style={styles.badgeTextMuted}>Priority: {wish.priority}</Text>
         </View>
         {completed && (
-          <View style={[styles.badge, { backgroundColor: '#E2F5EC' }]}>
-            <Text style={[styles.badgeText, { color: colors.success }]}>Completed ✓</Text>
+          <View style={[styles.badge, { backgroundColor: c.successBg }]}>
+            <Text style={[styles.badgeText, { color: c.success }]}>Completed ✓</Text>
           </View>
         )}
       </View>
@@ -119,19 +151,26 @@ export default function WishDetailScreen({ navigation, route }: Props) {
 
       {wish.description ? <Text style={styles.description}>{wish.description}</Text> : null}
 
+      {completed && wish.completionNote ? (
+        <View style={styles.noteBox}>
+          <Ionicons name="journal-outline" size={16} color={c.success} />
+          <Text style={styles.noteText}>{wish.completionNote}</Text>
+        </View>
+      ) : null}
+
       {wish.link ? (
         <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(wish.link!)}>
-          <Ionicons name="link-outline" size={16} color={colors.primary} />
+          <Ionicons name="link-outline" size={16} color={c.primary} />
           <Text style={styles.linkText} numberOfLines={1}>
             {wish.link}
           </Text>
-          <Ionicons name="open-outline" size={16} color={colors.primary} />
+          <Ionicons name="open-outline" size={16} color={c.primary} />
         </TouchableOpacity>
       ) : null}
 
       {iAmPlanning && (
         <View style={styles.planningNote}>
-          <Ionicons name="sparkles" size={16} color={colors.gold} />
+          <Ionicons name="sparkles" size={16} color={c.gold} />
           <Text style={styles.planningNoteText}>
             You're secretly planning this. {isMine ? '' : `${wish.createdByName} can't see it.`}
           </Text>
@@ -164,53 +203,68 @@ export default function WishDetailScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  missing: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
-  image: {
-    width: '100%',
-    height: 220,
-    borderRadius: radius.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.border,
-  },
-  imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  badgeRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  priorityBadge: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextMuted: { fontSize: 12, fontWeight: '600', color: colors.textMuted, textTransform: 'capitalize' },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.md },
-  creator: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  description: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: spacing.md },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  linkText: { flex: 1, fontSize: 13, color: colors.primary },
-  planningNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#FBF3E2',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  planningNoteText: { flex: 1, fontSize: 13, color: '#8A6D2F', fontWeight: '600' },
-  actions: { marginTop: spacing.lg, gap: spacing.sm },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    missing: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
+    image: {
+      width: '100%',
+      height: 220,
+      borderRadius: radius.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.border,
+    },
+    imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+    badgeRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: radius.pill,
+    },
+    priorityBadge: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+    badgeText: { fontSize: 12, fontWeight: '700' },
+    badgeTextMuted: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textMuted,
+      textTransform: 'capitalize',
+    },
+    title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.md },
+    creator: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
+    description: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: spacing.md },
+    noteBox: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      backgroundColor: colors.successBg,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    noteText: { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20, fontStyle: 'italic' },
+    linkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    linkText: { flex: 1, fontSize: 13, color: colors.primary },
+    planningNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.goldBg,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    planningNoteText: { flex: 1, fontSize: 13, color: colors.gold, fontWeight: '600' },
+    actions: { marginTop: spacing.lg, gap: spacing.sm },
+  });

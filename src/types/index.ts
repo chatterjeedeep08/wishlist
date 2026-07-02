@@ -25,6 +25,12 @@ export interface UserProfile {
   trialStart: Timestamp | null;
   subscriptionStatus: SubscriptionStatus;
   pushToken?: string | null;
+  /** Profile picture as a compressed base64 data URI (Spark-plan friendly). */
+  photo?: string | null;
+  /** Selected theme key (see src/theme.ts THEMES). */
+  theme?: string | null;
+  /** When true, the app follows the partner's theme instead of the own one. */
+  themeSync?: boolean;
   createdAt: Timestamp | null;
 }
 
@@ -52,6 +58,8 @@ export interface Wish {
   status: WishStatus;
   createdAt: Timestamp | null;
   completedAt: Timestamp | null;
+  /** Optional memory note added when the wish was completed. */
+  completionNote?: string | null;
 }
 
 export interface WishDraft {
@@ -79,6 +87,7 @@ export interface Plan {
 
 export type AppNotificationType =
   | 'wish_added'
+  | 'wish_updated'
   | 'partner_joined'
   | 'wish_completed';
 
@@ -89,6 +98,8 @@ export interface AppNotification {
   fromUserName: string;
   type: AppNotificationType;
   message: string;
+  /** Deep-link target: tapping the notification opens this wish. */
+  wishId?: string | null;
   read: boolean;
   createdAt: Timestamp | null;
 }

@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
 import { createInvite } from '../../services/coupleService';
-import { colors, radius, spacing } from '../../theme';
+import { Theme, radius, spacing } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
 
 /**
  * Generates the invite code (creating the couple document) and lets the
@@ -23,6 +24,8 @@ import { colors, radius, spacing } from '../../theme';
  */
 export default function InvitePartnerScreen() {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -49,7 +52,9 @@ export default function InvitePartnerScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Text style={styles.subtitle}>Could not create an invite. Check your connection and try again.</Text>
+        <Text style={styles.subtitle}>
+          Could not create an invite. Check your connection and try again.
+        </Text>
       </View>
     );
   }
@@ -66,12 +71,12 @@ export default function InvitePartnerScreen() {
         <TouchableOpacity style={styles.codeBox} onPress={copyCode} activeOpacity={0.8}>
           <Text style={styles.code}>{code}</Text>
           <View style={styles.copyHint}>
-            <Ionicons name="copy-outline" size={14} color={colors.textMuted} />
+            <Ionicons name="copy-outline" size={14} color={theme.colors.textMuted} />
             <Text style={styles.copyHintText}>Tap to copy</Text>
           </View>
         </TouchableOpacity>
       ) : (
-        <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
+        <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: spacing.xl }} />
       )}
 
       <Button title="Share code" onPress={shareCode} disabled={!code} />
@@ -83,51 +88,52 @@ export default function InvitePartnerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: spacing.lg,
-    justifyContent: 'center',
-  },
-  emoji: { fontSize: 48, textAlign: 'center' },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 21,
-  },
-  codeBox: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-  },
-  code: {
-    fontSize: 40,
-    fontWeight: '800',
-    letterSpacing: 8,
-    color: colors.primary,
-  },
-  copyHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
-  copyHintText: { fontSize: 12, color: colors.textMuted },
-  note: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    lineHeight: 19,
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: spacing.lg,
+      justifyContent: 'center',
+    },
+    emoji: { fontSize: 48, textAlign: 'center' },
+    title: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 21,
+    },
+    codeBox: {
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderStyle: 'dashed',
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginVertical: spacing.xl,
+    },
+    code: {
+      fontSize: 40,
+      fontWeight: '800',
+      letterSpacing: 8,
+      color: colors.primary,
+    },
+    copyHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
+    copyHintText: { fontSize: 12, color: colors.textMuted },
+    note: {
+      fontSize: 13,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.lg,
+      lineHeight: 19,
+    },
+  });

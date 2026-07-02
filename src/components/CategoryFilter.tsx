@@ -1,7 +1,8 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { WishType } from '../types';
-import { colors, radius, spacing, typeColor, WISH_TYPES } from '../theme';
+import { Theme, radius, spacing, typeColor, WISH_TYPES } from '../theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 interface Props {
   selected: WishType | 'all';
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export default function CategoryFilter({ selected, onSelect }: Props) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const options: { key: WishType | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
     ...WISH_TYPES.map((t) => ({ key: t.key, label: t.label })),
@@ -22,19 +25,15 @@ export default function CategoryFilter({ selected, onSelect }: Props) {
     >
       {options.map((opt) => {
         const active = selected === opt.key;
-        const color = opt.key === 'all' ? colors.primary : typeColor(opt.key as WishType);
+        const color =
+          opt.key === 'all' ? theme.colors.primary : typeColor(theme, opt.key as WishType);
         return (
           <TouchableOpacity
             key={opt.key}
-            style={[
-              styles.pill,
-              active && { backgroundColor: color, borderColor: color },
-            ]}
+            style={[styles.pill, active && { backgroundColor: color, borderColor: color }]}
             onPress={() => onSelect(opt.key)}
           >
-            <Text style={[styles.label, active && styles.labelActive]}>
-              {opt.label}
-            </Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{opt.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -42,16 +41,17 @@ export default function CategoryFilter({ selected, onSelect }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: { gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  pill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  label: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  labelActive: { color: '#fff' },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    row: { gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+    pill: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 8,
+      borderRadius: radius.pill,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    label: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+    labelActive: { color: '#fff' },
+  });

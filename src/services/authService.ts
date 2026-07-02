@@ -1,11 +1,17 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
   User,
 } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { UserProfile } from '../types';
+import { breakPair } from './coupleService';
 
 export async function signUp(name: string, email: string, password: string) {
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -30,6 +36,37 @@ export async function logIn(email: string, password: string): Promise<User> {
 
 export async function logOut() {
   await signOut(auth);
+}
+
+async function reauthenticate(currentPassword: string): Promise<User> {
+  const user = auth.currentUser;
+  if (!user?.email) throw new Error('Not signed in.');
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  return user;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+) {
+  const user = await reauthenticate(currentPassword);
+  await updatePassword(user, newPassword);
+}
+
+/**
+ * Permanently deletes the account: unpairs from the partner first (so
+ * they land back on partner setup cleanly), removes the user document,
+ * then deletes the Firebase Auth user. Requires the current password
+ * because Firebase demands a recent login for destructive actions.
+ */
+export async function deleteAccount(profile: UserProfile, currentPassword: string) {
+  const user = await reauthenticate(currentPassword);
+  if (profile.coupleId) {
+    await breakPair(profile);
+  }
+  await deleteDoc(doc(db, 'users', user.uid));
+  await deleteUser(user);
 }
 
 export function friendlyAuthError(err: unknown): string {

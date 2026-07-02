@@ -76,10 +76,12 @@ export async function createNotification(input: {
   fromUserName: string;
   type: AppNotificationType;
   message: string;
+  wishId?: string | null;
 }) {
   try {
     await addDoc(collection(db, 'notifications'), {
       ...input,
+      wishId: input.wishId ?? null,
       read: false,
       createdAt: serverTimestamp(),
     });

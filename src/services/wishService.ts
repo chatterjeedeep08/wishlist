@@ -69,6 +69,7 @@ export async function addWish(
       fromUserName: user.name,
       type: 'wish_added',
       message: `${user.name} added a new wish: “${draft.title.trim()}”`,
+      wishId: ref.id,
     });
   }
 
@@ -95,6 +96,25 @@ export function subscribeToWishes(
 export async function updateWish(wishId: string, updates: Partial<Wish>) {
   const { id: _id, ...rest } = updates;
   await updateDoc(doc(db, 'wishlistItems', wishId), rest);
+}
+
+/** Update a wish and let the partner know it changed. */
+export async function editWish(
+  user: UserProfile,
+  wishId: string,
+  updates: Partial<Wish>
+) {
+  await updateWish(wishId, updates);
+  if (user.partnerId && user.coupleId) {
+    await createNotification({
+      coupleId: user.coupleId,
+      toUserId: user.partnerId,
+      fromUserName: user.name,
+      type: 'wish_updated',
+      message: `${user.name} updated “${updates.title ?? 'a wish'}”`,
+      wishId,
+    });
+  }
 }
 
 function planRef(wishId: string, userId: string) {
@@ -149,10 +169,11 @@ export function subscribeToMyPlans(
   );
 }
 
-export async function completeWish(wish: Wish, user: UserProfile) {
+export async function completeWish(wish: Wish, user: UserProfile, note?: string) {
   await updateDoc(doc(db, 'wishlistItems', wish.id), {
     status: 'completed' satisfies WishStatus,
     completedAt: serverTimestamp(),
+    completionNote: note?.trim() || null,
   });
   await removeOwnPlan(wish.id, user.uid);
   if (user.partnerId) {
@@ -162,6 +183,7 @@ export async function completeWish(wish: Wish, user: UserProfile) {
       fromUserName: user.name,
       type: 'wish_completed',
       message: `${user.name} completed “${wish.title}” ✅`,
+      wishId: wish.id,
     });
   }
 }

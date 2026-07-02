@@ -18,10 +18,13 @@ service cloud.firestore {
       // the pairing flow which sets partnerId on the inviter's doc.
       allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid == userId;
+      // Pairing sets partnerId on the inviter's doc; unpairing clears
+      // partnerId + coupleId on the partner's doc.
       allow update: if signedIn() && (
         request.auth.uid == userId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerId'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerId', 'coupleId'])
       );
+      allow delete: if signedIn() && request.auth.uid == userId;
     }
 
     match /couples/{coupleId} {
@@ -35,6 +38,11 @@ service cloud.firestore {
         (resource.data.user2 == null &&
           request.resource.data.user2 == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['user2']))
+      );
+      // Breaking the pair deletes the couple document.
+      allow delete: if signedIn() && (
+        resource.data.user1 == request.auth.uid ||
+        resource.data.user2 == request.auth.uid
       );
     }
 

@@ -95,3 +95,27 @@ export async function getPartnerProfile(partnerId: string): Promise<UserProfile 
   if (!snap.exists()) return null;
   return snap.data() as UserProfile;
 }
+
+/**
+ * Breaks the pairing: both users lose partnerId/coupleId and the couple
+ * document is deleted, which also revokes access to the shared wishes
+ * (security rules resolve membership through the couple doc). The other
+ * partner's app returns to partner setup automatically.
+ */
+export async function breakPair(profile: UserProfile) {
+  if (!profile.coupleId) return;
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', profile.uid), {
+    coupleId: null,
+    partnerId: null,
+    themeSync: false,
+  });
+  if (profile.partnerId) {
+    batch.update(doc(db, 'users', profile.partnerId), {
+      partnerId: null,
+      coupleId: null,
+    });
+  }
+  batch.delete(doc(db, 'couples', profile.coupleId));
+  await batch.commit();
+}

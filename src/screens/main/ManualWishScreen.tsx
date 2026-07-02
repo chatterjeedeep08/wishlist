@@ -16,10 +16,12 @@ import Input from '../../components/Input';
 import TypeSelector from '../../components/TypeSelector';
 import { useAuth } from '../../context/AuthContext';
 import { useWishes } from '../../context/WishesContext';
-import { addWish, updateWish, WishLimitError } from '../../services/wishService';
+import { addWish, editWish, WishLimitError } from '../../services/wishService';
 import { prepareWishImage } from '../../services/imageService';
 import { WishPriority, WishType } from '../../types';
-import { colors, radius, spacing } from '../../theme';
+import { Theme, radius, spacing } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
+import { FieldErrors, hasErrors, validateWish } from '../../utils/validation';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ManualWish'>;
@@ -39,6 +41,8 @@ export default function ManualWishScreen({ navigation, route }: Props) {
   const editWishId = route.params?.editWishId;
   const { profile, fullAccess } = useAuth();
   const { wishes } = useWishes();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
 
   const editing = editWishId ? wishes.find((w) => w.id === editWishId) : undefined;
   const initial = editing ?? prefill;
@@ -48,22 +52,28 @@ export default function ManualWishScreen({ navigation, route }: Props) {
   const [link, setLink] = useState(initial?.link ?? '');
   const [price, setPrice] = useState(initial?.price ?? '');
   const [type, setType] = useState<WishType | null>(initial?.type ?? null);
-  const [priority, setPriority] = useState<WishPriority>(
-    editing?.priority ?? 'medium'
-  );
+  const [priority, setPriority] = useState<WishPriority>(editing?.priority ?? 'medium');
   const [localImage, setLocalImage] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
 
   // Existing remote image (edit mode) shown until a new one is picked.
   const displayImage = localImage ?? editing?.image ?? null;
 
+  const clearError = (field: string) =>
+    setErrors((e) => (e[field] ? { ...e, [field]: undefined } : e));
+
   const pickImage = async () => {
     // Image uploads are a premium/trial feature per the freemium model.
     if (!fullAccess) {
-      Alert.alert('Premium feature', 'Image uploads are limited on the free tier. Upgrade to attach photos.', [
-        { text: 'Not now' },
-        { text: 'Upgrade', onPress: () => navigation.navigate('Subscription') },
-      ]);
+      Alert.alert(
+        'Premium feature',
+        'Image uploads are limited on the free tier. Upgrade to attach photos.',
+        [
+          { text: 'Not now' },
+          { text: 'Upgrade', onPress: () => navigation.navigate('Subscription') },
+        ]
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -79,14 +89,10 @@ export default function ManualWishScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!profile) return;
-    if (!title.trim()) {
-      Alert.alert('Add a title', 'Give your wish a short title.');
-      return;
-    }
-    if (!type) {
-      Alert.alert('Pick a category', 'Choose food, activity, place or gift.');
-      return;
-    }
+    const fieldErrors = validateWish({ title, type, link, price });
+    setErrors(fieldErrors);
+    if (hasErrors(fieldErrors)) return;
+
     setSaving(true);
     try {
       let imageUrl: string | null = editing?.image ?? null;
@@ -94,8 +100,8 @@ export default function ManualWishScreen({ navigation, route }: Props) {
         imageUrl = await prepareWishImage(localImage);
       }
       if (editing) {
-        await updateWish(editing.id, {
-          type,
+        await editWish(profile, editing.id, {
+          type: type!,
           title: title.trim(),
           description: description.trim(),
           link: link.trim() || null,
@@ -108,7 +114,7 @@ export default function ManualWishScreen({ navigation, route }: Props) {
         await addWish(
           profile,
           {
-            type,
+            type: type!,
             source: 'manual',
             title,
             description,
@@ -142,13 +148,23 @@ export default function ManualWishScreen({ navigation, route }: Props) {
           <Image source={{ uri: displayImage }} style={styles.image} />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Ionicons name="image-outline" size={28} color={colors.textMuted} />
+            <Ionicons name="image-outline" size={28} color={theme.colors.textMuted} />
             <Text style={styles.imageText}>Add a photo (optional)</Text>
           </View>
         )}
       </TouchableOpacity>
 
-      <Input label="Title" value={title} onChangeText={setTitle} placeholder="e.g. Sushi dinner date" />
+      <Input
+        label="Title"
+        value={title}
+        onChangeText={(v) => {
+          setTitle(v);
+          clearError('title');
+        }}
+        error={errors.title}
+        placeholder="e.g. Sushi dinner date"
+        maxLength={100}
+      />
       <Input
         label="Description"
         value={description}
@@ -159,13 +175,24 @@ export default function ManualWishScreen({ navigation, route }: Props) {
       />
 
       <Text style={styles.label}>Category</Text>
-      <TypeSelector selected={type} onSelect={setType} />
+      <TypeSelector
+        selected={type}
+        onSelect={(t) => {
+          setType(t);
+          clearError('type');
+        }}
+        error={errors.type}
+      />
 
       <View style={{ height: spacing.md }} />
       <Input
         label="Link (optional)"
         value={link ?? ''}
-        onChangeText={setLink}
+        onChangeText={(v) => {
+          setLink(v);
+          clearError('link');
+        }}
+        error={errors.link}
         placeholder="https://…"
         autoCapitalize="none"
         keyboardType="url"
@@ -173,8 +200,13 @@ export default function ManualWishScreen({ navigation, route }: Props) {
       <Input
         label="Price (optional)"
         value={price ?? ''}
-        onChangeText={setPrice}
+        onChangeText={(v) => {
+          setPrice(v);
+          clearError('price');
+        }}
+        error={errors.price}
         placeholder="e.g. ₹1,500"
+        maxLength={30}
       />
 
       <Text style={styles.label}>Priority</Text>
@@ -185,9 +217,7 @@ export default function ManualWishScreen({ navigation, route }: Props) {
             style={[styles.priority, priority === p.key && styles.priorityActive]}
             onPress={() => setPriority(p.key)}
           >
-            <Text
-              style={[styles.priorityText, priority === p.key && styles.priorityTextActive]}
-            >
+            <Text style={[styles.priorityText, priority === p.key && styles.priorityTextActive]}>
               {p.label}
             </Text>
           </TouchableOpacity>
@@ -204,40 +234,41 @@ export default function ManualWishScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  imagePicker: { marginBottom: spacing.md },
-  image: { width: '100%', height: 180, borderRadius: radius.lg },
-  imagePlaceholder: {
-    height: 110,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.card,
-  },
-  imageText: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  priorityRow: { flexDirection: 'row', gap: spacing.sm },
-  priority: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  priorityActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  priorityText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  priorityTextActive: { color: '#fff' },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    imagePicker: { marginBottom: spacing.md },
+    image: { width: '100%', height: 180, borderRadius: radius.lg },
+    imagePlaceholder: {
+      height: 110,
+      borderRadius: radius.lg,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.card,
+    },
+    imageText: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textMuted,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    priorityRow: { flexDirection: 'row', gap: spacing.sm },
+    priority: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: radius.md,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    priorityActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    priorityText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+    priorityTextActive: { color: '#fff' },
+  });

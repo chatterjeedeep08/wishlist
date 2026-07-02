@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompositeScreenProps } from '@react-navigation/native';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import EmptyState from '../../components/EmptyState';
-import {
-  markNotificationRead,
-  subscribeToNotifications,
-} from '../../services/notificationService';
+import { useNotifications } from '../../context/NotificationsContext';
+import { markNotificationRead } from '../../services/notificationService';
 import { AppNotification } from '../../types';
-import { colors, radius, spacing } from '../../theme';
+import { Theme, radius, spacing } from '../../theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
+import { MainStackParamList, TabsParamList } from '../../navigation/types';
 
-const TYPE_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
-  wish_added: { icon: 'gift-outline', color: colors.primary, bg: colors.primaryLight },
-  partner_joined: { icon: 'heart', color: colors.gift, bg: colors.giftBg },
-  wish_completed: { icon: 'checkmark-circle-outline', color: colors.success, bg: '#E2F5EC' },
-};
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<TabsParamList, 'Notifications'>,
+  NativeStackScreenProps<MainStackParamList>
+>;
 
 function timeAgo(ts: AppNotification['createdAt']): string {
   if (!ts) return '';
@@ -27,28 +29,38 @@ function timeAgo(ts: AppNotification['createdAt']): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function NotificationsScreen() {
-  const { user } = useAuth();
-  const [items, setItems] = useState<AppNotification[]>([]);
+export default function NotificationsScreen({ navigation }: Props) {
+  const { notifications } = useNotifications();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const c = theme.colors;
 
-  useEffect(() => {
-    if (!user) return;
-    return subscribeToNotifications(user.uid, setItems);
-  }, [user?.uid]);
+  const typeMeta: Record<string, { icon: string; color: string; bg: string }> = {
+    wish_added: { icon: 'gift-outline', color: c.primary, bg: c.primaryLight },
+    wish_updated: { icon: 'create-outline', color: c.activity, bg: c.activityBg },
+    partner_joined: { icon: 'heart', color: c.gift, bg: c.giftBg },
+    wish_completed: { icon: 'checkmark-circle-outline', color: c.success, bg: c.successBg },
+  };
 
   const handlePress = (item: AppNotification) => {
-    if (!item.read) markNotificationRead(item.id);
+    if (!item.read) markNotificationRead(item.id).catch(() => {});
+    if (item.wishId) {
+      navigation.navigate('WishDetail', { wishId: item.wishId });
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Notifications</Text>
+      <Text style={[styles.title, { paddingTop: insets.top + spacing.md }]}>
+        Notifications
+      </Text>
       <FlatList
-        data={items}
+        data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => {
-          const meta = TYPE_ICONS[item.type] ?? TYPE_ICONS.wish_added;
+          const meta = typeMeta[item.type] ?? typeMeta.wish_added;
           return (
             <TouchableOpacity
               style={[styles.item, !item.read && styles.itemUnread]}
@@ -70,7 +82,7 @@ export default function NotificationsScreen() {
           <EmptyState
             emoji="🔔"
             title="No notifications yet"
-            subtitle="You'll see updates here when your partner adds or completes wishes."
+            subtitle="You'll see updates here when your partner adds, edits or completes wishes."
           />
         }
       />
@@ -78,37 +90,37 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  list: { padding: spacing.md, paddingTop: 0 },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
-  },
-  itemUnread: { borderColor: colors.primary },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  message: { fontSize: 14, color: colors.text, lineHeight: 20 },
-  time: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    title: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.text,
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    list: { padding: spacing.md, paddingTop: 0 },
+    item: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      gap: spacing.md,
+    },
+    itemUnread: { borderColor: colors.primary },
+    iconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    message: { fontSize: 14, color: colors.text, lineHeight: 20 },
+    time: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+    dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
+  });

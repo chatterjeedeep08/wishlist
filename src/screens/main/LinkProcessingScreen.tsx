@@ -16,7 +16,9 @@ import { useAuth } from '../../context/AuthContext';
 import { parseLink } from '../../services/linkParser';
 import { addWish, WishLimitError } from '../../services/wishService';
 import { LinkPreview, WishSource, WishType } from '../../types';
-import { colors, radius, spacing } from '../../theme';
+import { Theme, radius, spacing } from '../../theme';
+import { useThemedStyles } from '../../context/ThemeContext';
+import { FieldErrors, hasErrors, validateWish } from '../../utils/validation';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'LinkProcessing'>;
@@ -35,6 +37,7 @@ const SOURCE_NAMES: Record<string, string> = {
 export default function LinkProcessingScreen({ navigation, route }: Props) {
   const { url, sharedTitle, fromShare } = route.params;
   const { profile, fullAccess } = useAuth();
+  const styles = useThemedStyles(makeStyles);
 
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +45,7 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState(sharedTitle ?? '');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<WishType | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -60,14 +64,10 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!profile) return;
-    if (!type) {
-      Alert.alert('Pick a category', 'Choose whether this is food, an activity, a place or a gift.');
-      return;
-    }
-    if (!title.trim()) {
-      Alert.alert('Add a title', 'Give this wish a short title.');
-      return;
-    }
+    const fieldErrors = validateWish({ title, type });
+    setErrors(fieldErrors);
+    if (hasErrors(fieldErrors)) return;
+
     setSaving(true);
     try {
       const source: WishSource =
@@ -79,7 +79,7 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
       await addWish(
         profile,
         {
-          type,
+          type: type!,
           source,
           title,
           description,
@@ -107,7 +107,7 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={colors.primary} size="large" />
+        <ActivityIndicator size="large" />
         <Text style={styles.loadingText}>Reading the link…</Text>
       </View>
     );
@@ -129,7 +129,17 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
         {url}
       </Text>
 
-      <Input label="Title" value={title} onChangeText={setTitle} placeholder="What is it?" />
+      <Input
+        label="Title"
+        value={title}
+        onChangeText={(v) => {
+          setTitle(v);
+          if (errors.title) setErrors((e) => ({ ...e, title: undefined }));
+        }}
+        error={errors.title}
+        placeholder="What is it?"
+        maxLength={100}
+      />
       <Input
         label="Description"
         value={description}
@@ -143,7 +153,14 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
         Category{' '}
         {preview?.detectedType ? <Text style={styles.detected}>(auto-detected)</Text> : null}
       </Text>
-      <TypeSelector selected={type} onSelect={setType} />
+      <TypeSelector
+        selected={type}
+        onSelect={(t) => {
+          setType(t);
+          if (errors.type) setErrors((e) => ({ ...e, type: undefined }));
+        }}
+        error={errors.type}
+      />
 
       <Button
         title="Save wish"
@@ -155,43 +172,48 @@ export default function LinkProcessingScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  loading: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: { marginTop: spacing.md, color: colors.textMuted },
-  image: {
-    width: '100%',
-    height: 200,
-    borderRadius: radius.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.border,
-  },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sourceBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    color: colors.primaryDark,
-    fontWeight: '700',
-    fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  price: { fontSize: 15, fontWeight: '700', color: colors.text },
-  url: { fontSize: 12, color: colors.textMuted, marginTop: 6, marginBottom: spacing.md },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detected: { color: colors.success, textTransform: 'none' },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    loading: {
+      flex: 1,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingText: { marginTop: spacing.md, color: colors.textMuted },
+    image: {
+      width: '100%',
+      height: 200,
+      borderRadius: radius.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.border,
+    },
+    sourceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sourceBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.primaryLight,
+      color: colors.primaryDark,
+      fontWeight: '700',
+      fontSize: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      overflow: 'hidden',
+    },
+    price: { fontSize: 15, fontWeight: '700', color: colors.text },
+    url: { fontSize: 12, color: colors.textMuted, marginTop: 6, marginBottom: spacing.md },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textMuted,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    detected: { color: colors.success, textTransform: 'none' },
+  });

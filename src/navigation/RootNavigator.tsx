@@ -1,13 +1,23 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { WishesProvider } from '../context/WishesContext';
+import {
+  NotificationsProvider,
+  useNotifications,
+} from '../context/NotificationsContext';
+import { useTheme } from '../context/ThemeContext';
 import { useShareIntentSafe } from '../hooks/useShareIntentSafe';
 import { extractUrl } from '../services/linkParser';
-import { colors } from '../theme';
+import NotificationBanner from '../components/NotificationBanner';
 import {
   AuthStackParamList,
   MainStackParamList,
@@ -31,6 +41,7 @@ import CompletedWishesScreen from '../screens/main/CompletedWishesScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import SubscriptionScreen from '../screens/main/SubscriptionScreen';
+import ThemeSettingsScreen from '../screens/main/ThemeSettingsScreen';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const PartnerStack = createNativeStackNavigator<PartnerStackParamList>();
@@ -49,12 +60,13 @@ function AuthNavigator() {
 }
 
 function PartnerNavigator() {
+  const { theme } = useTheme();
   return (
     <PartnerStack.Navigator
       screenOptions={{
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.text,
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.text,
         headerTitle: '',
       }}
     >
@@ -77,13 +89,18 @@ const TAB_ICONS: Record<keyof TabsParamList, [string, string]> = {
 };
 
 function TabsNavigator() {
+  const { theme } = useTheme();
+  const { unreadCount } = useNotifications();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopColor: theme.colors.border,
+        },
         tabBarIcon: ({ focused, color, size }) => {
           const [active, inactive] = TAB_ICONS[route.name];
           return (
@@ -94,7 +111,21 @@ function TabsNavigator() {
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Wishlist" component={WishlistScreen} />
-      <Tabs.Screen name="Notifications" component={NotificationsScreen} />
+      <Tabs.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          // Red dot on the bell whenever there is unread partner activity.
+          tabBarBadge: unreadCount > 0 ? '' : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.danger,
+            minWidth: 10,
+            maxHeight: 10,
+            borderRadius: 5,
+            marginTop: 4,
+          },
+        }}
+      />
       <Tabs.Screen name="Profile" component={ProfileScreen} />
     </Tabs.Navigator>
   );
@@ -127,63 +158,90 @@ function ShareIntentGate() {
 }
 
 function MainNavigator() {
+  const { theme } = useTheme();
   return (
     <WishesProvider>
-      <ShareIntentGate />
-      <MainStack.Navigator
-        screenOptions={{
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-        }}
-      >
-        <MainStack.Screen name="Tabs" component={TabsNavigator} options={{ headerShown: false }} />
-        <MainStack.Screen
-          name="AddWish"
-          component={AddWishScreen}
-          options={{ title: 'Add a wish' }}
-        />
-        <MainStack.Screen
-          name="LinkProcessing"
-          component={LinkProcessingScreen}
-          options={{ title: 'New wish from link' }}
-        />
-        <MainStack.Screen
-          name="ManualWish"
-          component={ManualWishScreen}
-          options={({ route }) => ({
-            title: route.params?.editWishId ? 'Edit wish' : 'New wish',
-          })}
-        />
-        <MainStack.Screen
-          name="WishDetail"
-          component={WishDetailScreen}
-          options={{ title: 'Wish' }}
-        />
-        <MainStack.Screen
-          name="CompletedWishes"
-          component={CompletedWishesScreen}
-          options={{ title: 'Completed wishes' }}
-        />
-        <MainStack.Screen
-          name="Subscription"
-          component={SubscriptionScreen}
-          options={{ title: 'Premium' }}
-        />
-      </MainStack.Navigator>
+      <NotificationsProvider>
+        <ShareIntentGate />
+        <MainStack.Navigator
+          screenOptions={{
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.colors.background },
+            headerTintColor: theme.colors.text,
+          }}
+        >
+          <MainStack.Screen
+            name="Tabs"
+            component={TabsNavigator}
+            options={{ headerShown: false }}
+          />
+          <MainStack.Screen
+            name="AddWish"
+            component={AddWishScreen}
+            options={{ title: 'Add a wish' }}
+          />
+          <MainStack.Screen
+            name="LinkProcessing"
+            component={LinkProcessingScreen}
+            options={{ title: 'New wish from link' }}
+          />
+          <MainStack.Screen
+            name="ManualWish"
+            component={ManualWishScreen}
+            options={({ route }) => ({
+              title: route.params?.editWishId ? 'Edit wish' : 'New wish',
+            })}
+          />
+          <MainStack.Screen
+            name="WishDetail"
+            component={WishDetailScreen}
+            options={{ title: 'Wish' }}
+          />
+          <MainStack.Screen
+            name="CompletedWishes"
+            component={CompletedWishesScreen}
+            options={{ title: 'Completed wishes' }}
+          />
+          <MainStack.Screen
+            name="Subscription"
+            component={SubscriptionScreen}
+            options={{ title: 'Premium' }}
+          />
+          <MainStack.Screen
+            name="ThemeSettings"
+            component={ThemeSettingsScreen}
+            options={{ title: 'Themes' }}
+          />
+        </MainStack.Navigator>
+        <NotificationBanner />
+      </NotificationsProvider>
     </WishesProvider>
   );
 }
 
 export default function RootNavigator() {
   const { user, profile, initializing } = useAuth();
+  const { theme } = useTheme();
 
   if (initializing) {
     return <SplashScreen />;
   }
 
+  const navTheme = {
+    ...(theme.dark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(theme.dark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.card,
+      text: theme.colors.text,
+      border: theme.colors.border,
+      notification: theme.colors.danger,
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       {!user ? (
         <AuthNavigator />
       ) : !profile?.coupleId ? (
